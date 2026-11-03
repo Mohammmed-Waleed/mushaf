@@ -26,7 +26,7 @@ const JUZ = [[1,1],[2,142],[2,253],[3,93],[4,24],[4,148],[5,82],[6,111],[7,88],[
 
 /* ───────────── persistent state ───────────── */
 const DEF = {
-  settings: { theme: 'light', view: 'flow', fontSize: 36, zoom: 1, fitPage: true, spread: true, tr: 'en', reciter: 'Alafasy_128kbps', repeat: 1,
+  settings: { theme: 'light', view: 'flow', fontSize: 26, fsv: 2, zoom: 1, fitPage: true, spread: true, tr: 'en', reciter: 'Alafasy_128kbps', repeat: 1,
               dailyGoal: 2, dailyMode: 'rotate', fixedSurah: 36, fridayKahf: true },
   last: { page: 1, s: 1, a: 1 },
   bms: [],
@@ -39,6 +39,7 @@ let ST;
 try { ST = JSON.parse(localStorage.getItem('mushaf.v1') || 'null'); } catch { ST = null; }
 ST = Object.assign(structuredClone(DEF), ST || {});
 ST.settings = Object.assign({}, DEF.settings, ST.settings);
+if (ST.settings.fsv !== 2) { ST.settings.fontSize = DEF.settings.fontSize; ST.settings.fsv = 2; }
 let saveT;
 const save = () => { clearTimeout(saveT); saveT = setTimeout(() => { try { localStorage.setItem('mushaf.v1', JSON.stringify(ST)); } catch {} }, 250); };
 
@@ -136,6 +137,14 @@ function buildPage(p, wb, lhk) {
   const sName = SUR[fs - 1].en;
   el.innerHTML = `<div class="pg-head"><span>${esc(sName)}</span><span>Para ${juzOf(fs, fa)}</span></div><div class="pg-body"></div><div class="pg-foot">${p}</div>`;
   const body = $('.pg-body', el);
+  if (p <= 2) {
+    el.classList.add('cover');
+    el.insertAdjacentHTML('afterbegin', '<i class="orn tl"></i><i class="orn tr"></i><i class="orn bl"></i><i class="orn br"></i>');
+    body.style.height = (15 * lh) + 'px';
+    body.append(coverNode(p, wb - 12, 15 * lh, F * 1.8, false));
+    el.addEventListener('pointerdown', () => { focusPage = p; syncTop(); });
+    return el;
+  }
   for (const ln of PAGES[p - 1]) {
     const d = document.createElement('div');
     d.className = 'ln'; d.style.height = lh + 'px';
@@ -178,6 +187,7 @@ const flowMode = () => ST.settings.view === 'flow';
 
 function render(opts = {}) {
   if (flowMode()) return renderFlow();
+  readView.classList.remove('flowmode');
   stage.className = ''; stage.style.removeProperty('--fs');
   const { cols, wb, lhk } = geometry();
   spreadOn = cols === 2;
@@ -210,14 +220,49 @@ function syncTop() {
   const info = PGINFO[focusPage], [s, a] = info.first;
   $('#ttlPage').textContent = 'Page ' + focusPage;
   $('#ttlSurah').textContent = surahName(s);
-  $('#ttlJuz').textContent = `Para ${juzOf(s, a)} · ${spreadOn ? 'pages ' + visiblePages().join('–') : 'page ' + focusPage + ' of ' + TOTAL_PAGES}`;
+  $('#ttlJuz').textContent = `Para ${juzOf(s, a)} · ` + (flowMode() ? `page ${focusPage} · ${flowSub + 1}/${flowCount}` : spreadOn ? 'pages ' + visiblePages().join('–') : 'page ' + focusPage + ' of ' + TOTAL_PAGES);
   $('#btnBm').classList.toggle('on', ST.bms.some(b => !b.s && b.page === focusPage));
 }
 
-/* ───────────── large-text flowing view ───────────── */
-let flowFirst = 0, flowLast = 0, flowRaf = 0;
+/* ───────────── large-text paged view (swipe left / right, no scrolling) ───────────── */
+let flowSub = 0, flowCount = 1, flowW = 0, flowDrag = null;
 const BSM = 'بِسْمِ اللّٰهِ الرَّحْمٰنِ الرَّحِیْمِ';
-function flowPage(p) {
+// Pages 1 and 2 are short: show them as framed "cover" pages with larger text that fills the page.
+function coverNode(p, w, h, cap, flow) {
+  const lines = PAGES[p - 1].filter(l => l.t !== 'w' || l.w.length);
+  const nText = lines.filter(l => l.t !== 's').length;
+  let maxEm = 1;
+  for (const l of lines) {
+    if (l.t === 'w') maxEm = Math.max(maxEm, natEm(l.w.map(x => x[1]), FONTS[0], 0.3));
+    else if (l.t === 'b') maxEm = Math.max(maxEm, natEm(BSM.split(' '), FONTS[0], 0.3));
+  }
+  const size = Math.max(14, Math.min(w * 0.9 / maxEm, h / (1.95 * nText + 4.4), cap));
+  const el = document.createElement(flow ? 'section' : 'div');
+  el.className = flow ? 'fp cover' : 'cover-body';
+  if (flow) { el.dataset.page = p; el.insertAdjacentHTML('afterbegin', '<i class="orn tl"></i><i class="orn tr"></i><i class="orn bl"></i><i class="orn br"></i>'); }
+  el.style.fontSize = size + 'px';
+  for (const ln of lines) {
+    if (ln.t === 's') {
+      const S = SUR[ln.s - 1];
+      el.insertAdjacentHTML('beforeend', `<div class="cv-h"><div class="sbox"><span>سُورَةُ ${esc(S.ar)}</span><small>${esc(S.en)}</small></div><div class="csub">${esc(S.tr)} · ${S.n} ayahs · ${S.place}</div></div>`);
+    } else if (ln.t === 'b') {
+      el.insertAdjacentHTML('beforeend', `<div class="cline">${BSM}</div>`);
+    } else {
+      const d = document.createElement('div'); d.className = 'cline';
+      for (const [loc, text] of ln.w) {
+        const sp = document.createElement('span');
+        sp.className = LETTER.test(text) ? 'w' : 'w end';
+        sp.dataset.k = loc.split(':').slice(0, 2).join(':');
+        sp.textContent = text;
+        d.appendChild(sp);
+      }
+      el.appendChild(d);
+    }
+  }
+  return el;
+}
+function flowPage(p, ctx) {
+  if (ctx && p <= 2) return coverNode(p, ctx.w - 36, ctx.h - 44, ST.settings.fontSize * 1.8, true);
   const el = document.createElement('section');
   el.className = 'fp'; el.dataset.page = p;
   const [fs, fa] = PGINFO[p].first;
@@ -241,70 +286,106 @@ function flowPage(p) {
       }
     }
   }
+  if (para) para.append(Object.assign(document.createElement('span'), { className: 'tail' }));
   return el;
 }
-function flowEnd() { return $('.fend', stage); }
-function appendFlow() {
-  if (flowLast >= TOTAL_PAGES) return;
-  const el = flowPage(++flowLast);
-  stage.insertBefore(el, flowEnd());
-  markScope(el);
-  if (flowLast - flowFirst >= 14 && focusPage > flowFirst + 4) {   // keep the DOM small on long reads
-    const h0 = readView.scrollHeight, first = $('.fp', stage);
-    first.remove(); flowFirst++;
-    readView.scrollTop -= h0 - readView.scrollHeight;
+// Which screen (column) an element sits in, given the current slide offset.
+function colOf(el) {
+  const fv = $('.fview', stage), r = el.getBoundingClientRect();
+  const x = r.left + r.width / 2 - fv.getBoundingClientRect().left - flowSub * flowW;
+  return clamp(Math.floor(-x / flowW) + 1, 0, 999);
+}
+function setSub(n, animate = true) {
+  const cols = $('.fcols', stage); if (!cols) return;
+  flowSub = clamp(n, 0, flowCount - 1);
+  cols.classList.toggle('drag', !animate);
+  cols.style.transform = `translateX(${flowSub * flowW}px)`;
+  syncTop();
+}
+function firstVisibleKey() {
+  for (const w of $$('.w', stage)) if (colOf(w) === flowSub) return w.dataset.k;
+  return null;
+}
+function showKey(k) {
+  const w = $(`.w[data-k="${k}"]`, stage);
+  if (w) setSub(colOf(w));
+}
+// Nudge the text size (within about -10% / +15%) so the last screen of the page is filled, not half empty.
+function fitFill(cols, colH) {
+  if (cur <= 2) return;
+  const tail = $('.tail', cols); if (!tail) return;
+  const base = ST.settings.fontSize;
+  const probe = m => {
+    stage.style.setProperty('--fs', base * m + 'px');
+    return (tail.getBoundingClientRect().bottom - cols.getBoundingClientRect().top) / colH;
+  };
+  for (const m of [1, 1.03, 0.97, 1.06, 0.94, 1.09, 0.91, 1.12, 1.15, 0.9]) {
+    const fill = probe(m);
+    if (fill >= 0.9 && fill <= 1.001) return;
   }
-  $('.fprev', stage).hidden = flowFirst <= 1;
+  probe(1);
 }
-function prependFlow() {
-  if (flowFirst <= 1) return;
-  const h0 = readView.scrollHeight;
-  const el = flowPage(--flowFirst);
-  stage.insertBefore(el, $('.fp', stage));
-  markScope(el);
-  readView.scrollTop += readView.scrollHeight - h0;
-  if (flowLast - flowFirst >= 14) { $$('.fp', stage).pop().remove(); flowLast--; }
-  $('.fprev', stage).hidden = flowFirst <= 1;
-}
-function fillFlow() {
-  while (flowLast < TOTAL_PAGES && readView.scrollHeight < readView.scrollTop + readView.clientHeight * 2.5) appendFlow();
-}
-function renderFlow() {
+function renderFlow(startSub = 0) {
   spreadOn = false;
+  readView.classList.add('flowmode');
   stage.className = 'flow';
   stage.style.setProperty('--fs', ST.settings.fontSize + 'px');
-  stage.replaceChildren();
-  const prev = document.createElement('button'); prev.className = 'btn ghost sm fprev'; prev.textContent = '↑ Previous page';
-  prev.onclick = prependFlow;
-  const end = document.createElement('div'); end.className = 'fend';
-  const next = document.createElement('button'); next.className = 'btn ghost sm fnext'; next.textContent = 'Next page ↓';
-  next.onclick = () => { appendFlow(); readView.scrollBy({ top: readView.clientHeight * 0.8, behavior: 'smooth' }); };
-  end.append(next);
-  stage.append(prev, end);
-  flowFirst = flowLast = cur;
-  stage.insertBefore(flowPage(cur), end);
-  prev.hidden = cur <= 1;
-  readView.scrollTop = 0;
+  const W = flowW = readView.clientWidth, H = readView.clientHeight;
+  const colW = Math.min(W - 32, 760), gap = W - colW;
+  const fv = document.createElement('div'); fv.className = 'fview';
+  const cols = document.createElement('div'); cols.className = 'fcols drag';
+  cols.style.cssText = `height:${H - 24}px;width:${colW}px;column-width:${colW}px;column-gap:${gap}px;margin:12px ${gap / 2}px`;
+  cols.append(flowPage(cur, { w: colW, h: H - 24 }));
+  fv.append(cols);
+  stage.replaceChildren(fv);
+  flowSub = 0; flowCount = 999;
+  fitFill(cols, H - 24);
+  const words = $$('.w', cols), end = $('.tail', cols) || words[words.length - 1];
+  flowCount = end ? colOf(end) + 1 : 1;
+  focusPage = cur;
   markScope(stage);
-  fillFlow();
-  syncTop();
+  setSub(startSub === 'last' ? flowCount - 1 : startSub, false);
   ST.last.page = cur; save();
   trackRead([cur]);
 }
-function onFlowScroll() {
-  flowRaf = 0;
-  if (!flowMode() || !$('#v-read').classList.contains('on')) return;
-  if (readView.scrollTop + readView.clientHeight * 2 > readView.scrollHeight) fillFlow();
-  const top = readView.getBoundingClientRect().top + 70;
-  let pg = flowFirst;
-  for (const el of $$('.fp', stage)) { if (el.getBoundingClientRect().top <= top) pg = +el.dataset.page; else break; }
-  if (pg !== focusPage) { focusPage = cur = pg; ST.last.page = pg; save(); syncTop(); trackRead([pg]); }
+// dir > 0 = forward (next screen), dir < 0 = back
+function flowStep(dir) {
+  if (dir > 0) {
+    if (flowSub < flowCount - 1) return setSub(flowSub + 1);
+    if (cur < TOTAL_PAGES) { cur++; hlKey = null; renderFlow(0); }
+  } else {
+    if (flowSub > 0) return setSub(flowSub - 1);
+    if (cur > 1) { cur--; hlKey = null; renderFlow('last'); }
+  }
 }
-readView.addEventListener('scroll', () => { if (!flowRaf && flowMode()) flowRaf = requestAnimationFrame(onFlowScroll); }, { passive: true });
+// finger-follow swipe
+stage.addEventListener('touchstart', e => {
+  if (!flowMode() || e.touches.length !== 1) return;
+  flowDrag = { x: e.touches[0].clientX, y: e.touches[0].clientY, dx: 0, t: Date.now() };
+}, { passive: true });
+stage.addEventListener('touchmove', e => {
+  if (!flowDrag) return;
+  flowDrag.dx = e.touches[0].clientX - flowDrag.x;
+  const cols = $('.fcols', stage); if (!cols) return;
+  cols.classList.add('drag');
+  cols.style.transform = `translateX(${flowSub * flowW + flowDrag.dx}px)`;
+}, { passive: true });
+function endDrag() {
+  if (!flowDrag) return;
+  const { dx, t } = flowDrag; flowDrag = null;
+  const fast = Date.now() - t < 350;
+  if (Math.abs(dx) > (fast ? 40 : flowW * 0.25)) { setSub(flowSub, true); flowStep(dx > 0 ? 1 : -1); }
+  else setSub(flowSub, true);
+}
+stage.addEventListener('touchend', endDrag);
+stage.addEventListener('touchcancel', endDrag);
 
 function setFont(n) {
   ST.settings.fontSize = clamp(Math.round(n), 22, 84); save();
-  stage.style.setProperty('--fs', ST.settings.fontSize + 'px');
+  if (!flowMode()) return;
+  const k = firstVisibleKey();
+  renderFlow(0);
+  if (k) showKey(k);
 }
 function setView(v) {
   ST.settings.view = v; save();
@@ -335,9 +416,13 @@ function goto(page, o = {}) {
   if (o.k) hlKey = o.k; else if (!o.keep) hlKey = null;
   show('read', true);
   render();
-  if (o.k) { const w = $(`.w[data-k="${o.k}"]`, stage); if (w) w.scrollIntoView({ block: 'center', inline: 'nearest' }); focusPage = cur = AY[o.k].page; syncTop(); }
+  if (o.k) {
+    focusPage = cur = AY[o.k].page;
+    if (flowMode()) showKey(o.k);
+    else { const w = $(`.w[data-k="${o.k}"]`, stage); if (w) w.scrollIntoView({ block: 'center', inline: 'nearest' }); syncTop(); }
+  }
 }
-const step = dir => goto(cur + dir * (spreadOn ? 2 : 1), { keep: false });
+const step = dir => flowMode() ? flowStep(dir) : goto(cur + dir * (spreadOn ? 2 : 1), { keep: false });
 $('#navNext').onclick = () => step(1);
 $('#navPrev').onclick = () => step(-1);
 
@@ -355,7 +440,7 @@ addEventListener('keydown', e => {
   else if (e.key === 'ArrowRight') step(-1);
   else if (e.key === 'b' || e.key === 'B') toggleBm();
 });
-let rzT; addEventListener('resize', () => { clearTimeout(rzT); rzT = setTimeout(() => $('#v-read').classList.contains('on') && PAGES && !flowMode() && render(), 150); });
+let rzT; addEventListener('resize', () => { clearTimeout(rzT); rzT = setTimeout(() => { if (!$('#v-read').classList.contains('on') || !PAGES) return; const k = flowMode() ? firstVisibleKey() : null; render(); if (k) showKey(k); }, 150); });
 
 stage.addEventListener('click', e => {
   const w = e.target.closest('.w');
@@ -484,10 +569,10 @@ function startPlay(k) {
   $('#pTitle').textContent = `${surahName(ay.s)} ${ay.s}:${ay.a}`;
   $('#pSub').textContent = RECITERS[ST.settings.reciter] + (ST.settings.repeat > 1 ? ` · ×${ST.settings.repeat}` : '');
   $('#pPlay').textContent = '⏸';
-  if (flowMode() && ay.page > flowLast && ay.page <= flowLast + 2) while (flowLast < ay.page) appendFlow();
   if (!visiblePages().includes(ay.page)) { cur = ay.page; focusPage = ay.page; render(); }
   applyMarks();
-  const w = $(`.w.playing`, stage); if (w) w.scrollIntoView({ block: flowMode() ? 'center' : 'nearest', behavior: flowMode() ? 'smooth' : 'auto' });
+  if (flowMode()) showKey(k);
+  else { const w = $(`.w.playing`, stage); if (w) w.scrollIntoView({ block: 'nearest' }); }
 }
 function stopPlay() { audio.pause(); playKey = null; $('#player').hidden = true; applyMarks(); }
 audio.onended = () => {
@@ -664,7 +749,7 @@ function renderSettings() {
     <h2>Settings</h2>
     <h3>Reading</h3>
     <label class="f">Theme<select id="sTheme">${THEMES.map(t => opt(t, S.theme, t[0].toUpperCase() + t.slice(1))).join('')}</select></label>
-    <label class="f">View<select id="sView">${opt('flow', S.view, 'Large text (scrolling)')}${opt('mushaf', S.view, '15-line mushaf pages')}</select></label>
+    <label class="f">View<select id="sView">${opt('flow', S.view, 'Large text (swipe pages)')}${opt('mushaf', S.view, '15-line mushaf pages')}</select></label>
     <label class="f">Text size (large text)<input type="range" id="sFont" min="22" max="84" value="${S.fontSize}"></label>
     <label class="f">Page size (15-line mushaf)<input type="range" id="sZoom" min="0.7" max="1.6" step="0.05" value="${S.zoom}"></label>
     <label class="f">Fit whole page on screen (15-line)<input type="checkbox" id="sFit" ${S.fitPage ? 'checked' : ''}></label>
@@ -717,17 +802,23 @@ function renderSettings() {
 
 /* ───────────── boot ───────────── */
 async function boot() {
+  const t0 = Date.now(), msg = t => { const m = $('#bootmsg'); if (m) m.textContent = t; };
   setTheme(ST.settings.theme);
   try {
+    msg('Loading the Quran…');
     await loadData();
+    msg('Preparing the script…');
     await Promise.all(FONTS.map(f => document.fonts.load(`40px "${f}"`, 'بِسْمِ اللّٰهِ')));
     await document.fonts.ready;
   } catch (e) {
-    $('#bootmsg').textContent = 'Could not load the Quran data. Please serve this folder over http (see README) and reload.';
+    msg('Could not load the Quran data. Please serve this folder over http (see README) and reload.');
+    $('#boot').classList.add('failed');
     console.error(e); return;
   }
   calibrate();
+  msg('Bismillah…');
   render();
+  await new Promise(r => setTimeout(r, Math.max(0, 1100 - (Date.now() - t0))));
   $('#boot').classList.add('off');
   setTimeout(() => $('#boot').remove(), 400);
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});

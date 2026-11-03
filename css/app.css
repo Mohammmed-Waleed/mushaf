@@ -118,23 +118,56 @@ input[type=range]{accent-color:var(--accent);width:150px}
 #toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#222;color:#fff;padding:9px 16px;border-radius:99px;z-index:40;font-size:14px;max-width:90%}
 #boot{position:fixed;inset:0;background:var(--bg);display:grid;place-items:center;text-align:center;z-index:50;transition:opacity .3s}
 #boot.off{opacity:0;pointer-events:none}
-.bootmark{font-family:"IP Normal",serif;font-size:56px;color:var(--accent)}
 
 @media (max-width:520px){#ttlMid small{display:none}}
 
-/* ---------- large-text flowing view ---------- */
-#v-read{overflow-anchor:none}
-#stage.flow{display:block;max-width:860px;margin:0 auto;padding:4px 16px 90px;gap:0}
+/* ---------- large-text paged view ---------- */
+#v-read.flowmode{overflow:hidden}
+#stage.flow{display:block;padding:0;margin:0;width:100%;height:100%;min-height:0;gap:0;touch-action:none}
+.fview{position:relative;overflow:hidden;width:100%;height:100%;direction:rtl}
+.fcols{direction:rtl;column-fill:auto;transition:transform .28s ease;will-change:transform}
+.fcols.drag{transition:none}
 .fp{direction:rtl}
-.fdiv{display:flex;align-items:center;gap:10px;font:500 11px var(--ui);color:var(--muted);margin:16px 0 4px;direction:ltr}
+.fdiv{display:flex;align-items:center;gap:10px;font:500 11px var(--ui);color:var(--muted);margin:0 0 4px;direction:ltr;break-inside:avoid}
 .fdiv::before,.fdiv::after{content:"";flex:1;border-top:1px solid var(--line)}
-.ftxt{font-family:"IP Normal","Noto Naskh Arabic",serif;font-size:var(--fs,36px);line-height:2.3;text-align:justify;text-align-last:start;margin:.15em 0;word-spacing:.1em;direction:rtl;user-select:none}
+.ftxt{font-family:"IP Normal","Noto Naskh Arabic",serif;font-size:var(--fs,36px);line-height:2.2;text-align:justify;text-align-last:start;margin:.1em 0;word-spacing:.1em;direction:rtl;user-select:none;orphans:2;widows:2}
 .ftxt .w{cursor:pointer;border-radius:.2em;padding:0 .03em;transition:background .15s}
 .ftxt .w:hover{background:var(--hl)}
-.fhdr{margin:14px 0 6px;font-family:"IP Normal","Noto Naskh Arabic",serif;font-size:var(--fs,36px)}
+.fhdr{margin:10px 0 6px;font-family:"IP Normal","Noto Naskh Arabic",serif;font-size:var(--fs,36px);break-inside:avoid}
 .fhdr .sbox{width:100%;height:auto;padding:.22em .6em;font-size:.85em}
-.fbsm{font-family:"IP Normal","Noto Naskh Arabic",serif;font-size:var(--fs,36px);text-align:center;line-height:2.3;direction:rtl}
-.fprev{display:block;margin:12px auto 4px;direction:ltr}
-.fnext{display:block;margin:18px auto 0;direction:ltr}
+.fbsm{font-family:"IP Normal","Noto Naskh Arabic",serif;font-size:var(--fs,36px);text-align:center;line-height:2.2;direction:rtl;break-inside:avoid}
 .para-ar{font-size:19px!important;flex:none;max-width:40%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .item .sp{min-width:0}
+
+/* ---------- loading screen ---------- */
+#boot{background:radial-gradient(circle at 50% 38%,color-mix(in srgb,var(--accent) 16%,var(--bg)),var(--bg) 70%)}
+.bootbox{display:flex;flex-direction:column;align-items:center;gap:6px;padding:0 24px}
+.bootlogo{width:112px;height:112px;filter:drop-shadow(0 8px 22px #0003);animation:bootfloat 2.4s ease-in-out infinite}
+.bootlogo .star{transform-origin:60px 29px;animation:bootspin 9s linear infinite}
+.bootar{font-family:"IP Normal","Noto Naskh Arabic",serif;font-size:40px;line-height:1.7;margin-top:10px;color:var(--ink)}
+.bootname{font:600 13px var(--ui);letter-spacing:.32em;text-transform:uppercase;color:var(--muted)}
+.bootbar{width:160px;height:4px;border-radius:9px;background:var(--line);overflow:hidden;margin-top:18px}
+.bootbar i{display:block;width:45%;height:100%;border-radius:9px;background:var(--accent);animation:bootslide 1.2s ease-in-out infinite}
+#bootmsg{margin:8px 0 0;font-size:13px;color:var(--muted)}
+#boot.failed .bootbar{display:none}
+@keyframes bootfloat{50%{transform:translateY(-6px)}}
+@keyframes bootspin{to{transform:rotate(360deg)}}
+@keyframes bootslide{0%{transform:translateX(-110%)}100%{transform:translateX(260%)}}
+@media (prefers-reduced-motion:reduce){.bootlogo,.bootlogo .star,.bootbar i{animation:none}}
+
+/* ---------- decorated cover pages (1 and 2) ---------- */
+.cover-body,.fp.cover{display:flex;flex-direction:column;justify-content:space-evenly;align-items:center;font-family:"IP Normal","Noto Naskh Arabic",serif}
+.cover-body{height:100%;width:100%}
+.fp.cover{position:relative;height:100%;box-sizing:border-box;padding:22px 14px;border:3px double var(--frame);border-radius:16px;
+  background:radial-gradient(circle at 50% 46%,color-mix(in srgb,var(--frame) 14%,transparent),transparent 74%),repeating-linear-gradient(45deg,transparent 0 14px,color-mix(in srgb,var(--frame) 6%,transparent) 14px 15px)}
+.pg.cover{position:relative;border-width:3px;outline-width:2px;background:radial-gradient(circle at 50% 46%,color-mix(in srgb,var(--frame) 14%,var(--paper)),var(--paper) 74%)}
+.cline{display:flex;justify-content:center;gap:.3em;white-space:nowrap;line-height:1.95;direction:rtl;width:100%}
+.cline .w{cursor:pointer;border-radius:.2em;padding:0 .02em}
+.cv-h{text-align:center;width:100%}
+.cv-h .sbox{width:96%;height:auto;margin:0 auto;padding:.22em .6em;font-size:.85em}
+.csub{font:500 12px var(--ui);color:var(--muted);margin-top:6px;letter-spacing:.02em}
+.orn{position:absolute;width:14px;height:14px;border:2px solid var(--frame);background:var(--paper);transform:rotate(45deg);z-index:1}
+.orn::after{content:"";position:absolute;inset:2.5px;background:var(--frame)}
+.orn.tl{top:-9px;left:-9px}.orn.tr{top:-9px;right:-9px}.orn.bl{bottom:-9px;left:-9px}.orn.br{bottom:-9px;right:-9px}
+.pg.cover .orn.tl{top:2px;left:2px}.pg.cover .orn.tr{top:2px;right:2px}.pg.cover .orn.bl{bottom:2px;left:2px}.pg.cover .orn.br{bottom:2px;right:2px}
+.tail{display:inline-block;width:0;height:2.2em;vertical-align:top}
