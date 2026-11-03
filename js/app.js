@@ -26,7 +26,7 @@ const JUZ = [[1,1],[2,142],[2,253],[3,93],[4,24],[4,148],[5,82],[6,111],[7,88],[
 
 /* ───────────── persistent state ───────────── */
 const DEF = {
-  settings: { theme: 'light', view: 'flow', fontSize: 26, fsv: 2, zoom: 1, fitPage: true, spread: true, tr: 'en', reciter: 'Alafasy_128kbps', repeat: 1,
+  settings: { theme: 'light', view: 'flow', fontSize: 26, fsv: 3, zoom: 1, fitPage: true, spread: true, tr: 'en', reciter: 'Alafasy_128kbps', repeat: 1,
               dailyGoal: 2, dailyMode: 'rotate', fixedSurah: 36, fridayKahf: true },
   last: { page: 1, s: 1, a: 1 },
   bms: [],
@@ -39,7 +39,7 @@ let ST;
 try { ST = JSON.parse(localStorage.getItem('mushaf.v1') || 'null'); } catch { ST = null; }
 ST = Object.assign(structuredClone(DEF), ST || {});
 ST.settings = Object.assign({}, DEF.settings, ST.settings);
-if (ST.settings.fsv !== 2) { ST.settings.fontSize = DEF.settings.fontSize; ST.settings.fsv = 2; }
+if (ST.settings.fsv !== 3) { ST.settings.fontSize = DEF.settings.fontSize; ST.settings.fsv = 3; }  // large-text size is fixed at 26px
 let saveT;
 const save = () => { clearTimeout(saveT); saveT = setTimeout(() => { try { localStorage.setItem('mushaf.v1', JSON.stringify(ST)); } catch {} }, 250); };
 
@@ -380,13 +380,6 @@ function endDrag() {
 stage.addEventListener('touchend', endDrag);
 stage.addEventListener('touchcancel', endDrag);
 
-function setFont(n) {
-  ST.settings.fontSize = clamp(Math.round(n), 22, 84); save();
-  if (!flowMode()) return;
-  const k = firstVisibleKey();
-  renderFlow(0);
-  if (k) showKey(k);
-}
 function setView(v) {
   ST.settings.view = v; save();
   render();
@@ -394,17 +387,10 @@ function setView(v) {
 function openLook() {
   const S = ST.settings;
   openSheet(`<h2>Reading view</h2>
-    <div class="seg" id="lkView"><button data-v="flow" class="${S.view === 'flow' ? 'on' : ''}">Large text</button><button data-v="mushaf" class="${S.view === 'mushaf' ? 'on' : ''}">15-line mushaf</button></div>
-    <h3>Text size (large text view)</h3>
-    <div class="row"><button class="btn ghost" id="lkMinus" aria-label="Smaller">A−</button><input type="range" id="lkSize" min="22" max="84" value="${S.fontSize}" style="flex:1;width:auto"><button class="btn ghost" id="lkPlus" aria-label="Larger">A+</button></div>
-    <div class="ar" id="lkPrev" style="font-size:${S.fontSize}px;text-align:center;margin-top:10px">اَلْحَمْدُ لِلّٰهِ رَبِّ الْعٰلَمِیْنَ</div>
+    <div class="seg" id="lkView"><button data-v="flow" class="${S.view === 'flow' ? 'on' : ''}">Big text</button><button data-v="mushaf" class="${S.view === 'mushaf' ? 'on' : ''}">15-line mushaf</button></div>
     <h3>Theme</h3>
     <div class="seg" id="lkTheme">${THEMES.map(t => `<button data-t="${t}" class="${S.theme === t ? 'on' : ''}">${t[0].toUpperCase() + t.slice(1)}</button>`).join('')}</div>`, sh => {
     $$('#lkView button').forEach(b => b.onclick = () => { setView(b.dataset.v); $$('#lkView button').forEach(x => x.classList.toggle('on', x === b)); });
-    const size = n => { setFont(n); $('#lkSize').value = ST.settings.fontSize; $('#lkPrev').style.fontSize = ST.settings.fontSize + 'px'; };
-    $('#lkSize').oninput = e => size(+e.target.value);
-    $('#lkMinus').onclick = () => size(ST.settings.fontSize - 3);
-    $('#lkPlus').onclick = () => size(ST.settings.fontSize + 3);
     $$('#lkTheme button').forEach(b => b.onclick = () => { setTheme(b.dataset.t); $$('#lkTheme button').forEach(x => x.classList.toggle('on', x === b)); });
   });
 }
@@ -749,8 +735,7 @@ function renderSettings() {
     <h2>Settings</h2>
     <h3>Reading</h3>
     <label class="f">Theme<select id="sTheme">${THEMES.map(t => opt(t, S.theme, t[0].toUpperCase() + t.slice(1))).join('')}</select></label>
-    <label class="f">View<select id="sView">${opt('flow', S.view, 'Large text (swipe pages)')}${opt('mushaf', S.view, '15-line mushaf pages')}</select></label>
-    <label class="f">Text size (large text)<input type="range" id="sFont" min="22" max="84" value="${S.fontSize}"></label>
+    <label class="f">View<select id="sView">${opt('flow', S.view, 'Big text (swipe pages)')}${opt('mushaf', S.view, '15-line mushaf pages')}</select></label>
     <label class="f">Page size (15-line mushaf)<input type="range" id="sZoom" min="0.7" max="1.6" step="0.05" value="${S.zoom}"></label>
     <label class="f">Fit whole page on screen (15-line)<input type="checkbox" id="sFit" ${S.fitPage ? 'checked' : ''}></label>
     <label class="f">Two-page spread on wide screens (15-line)<input type="checkbox" id="sSpread" ${S.spread ? 'checked' : ''}></label>
@@ -772,7 +757,6 @@ function renderSettings() {
   const on = (id, ev, fn) => $(id).addEventListener(ev, fn);
   on('#sTheme', 'change', e => setTheme(e.target.value));
   on('#sView', 'change', e => { S.view = e.target.value; save(); });
-  on('#sFont', 'change', e => { S.fontSize = +e.target.value; save(); });
   on('#sZoom', 'change', e => { S.zoom = +e.target.value; save(); });
   on('#sFit', 'change', e => { S.fitPage = e.target.checked; save(); });
   on('#sSpread', 'change', e => { S.spread = e.target.checked; save(); });

@@ -1,5 +1,5 @@
 // Cache-first service worker so the whole mushaf works offline after the first visit.
-const CACHE = 'mushaf-v5';
+const CACHE = 'mushaf-v6';
 const CORE = [
   './', 'index.html', 'css/app.css', 'js/app.js', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',
   'fonts/nastaleeq-normal.woff2', 'fonts/nastaleeq-compact.woff2', 'fonts/nastaleeq-compressed.woff2',
