@@ -669,7 +669,6 @@ function streak() {
   return n;
 }
 function hijri() { try { return new Intl.DateTimeFormat('en-u-ca-islamic-umalqura', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date()); } catch { return ''; } }
-const QUICK = [36, 67, 18, 55, 56, 112];   // Yaseen, Al-Mulk, Al-Kahf, Ar-Rahman, Al-Waqiah, Al-Ikhlas
 
 function renderDaily() {
   markDay(); save();
@@ -702,8 +701,7 @@ function renderDaily() {
       return `<div class="card" data-s="${n}">
         <div class="row"><div class="num">${n}</div><div class="sp"><b>${esc(S.en)}</b><div class="muted sm">${S.n} ayahs · ${pg} page${pg > 1 ? 's' : ''} · from p.${surahPage(n)}</div></div><div class="ar" style="font-size:26px">${esc(S.ar)}</div></div>
         <div class="btns"><button class="btn sm" data-act="read">Read</button><button class="btn ghost sm" data-act="listen">▶ Listen</button><button class="btn sm ${done ? '' : 'ghost'}" data-act="done">${done ? '✓ Done today' : 'Mark done'}</button><button class="btn ghost sm" data-act="rm" aria-label="Remove ${esc(S.en)}">Remove</button></div></div>`;
-    }).join('') : `<div class="card"><div class="muted sm">Add the surahs you want to recite every day. They reset each morning, and a surah is ticked automatically once you have read all its pages. Quick add:</div>
-      <div class="btns">${QUICK.map(n => `<button class="btn ghost sm" data-act="quick" data-s="${n}">${esc(SUR[n - 1].en)}</button>`).join('')}</div></div>`}`;
+    }).join('') : `<div class="card"><div class="muted sm">Add the surahs you want to recite every day. They reset each morning, and a surah is ticked automatically once you have read all its pages.</div></div>`}`;
 }
 $('#dailyBody').addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b) return;
@@ -712,7 +710,6 @@ $('#dailyBody').addEventListener('click', e => {
   if (act === 'goal-' || act === 'goal+') { S.dailyGoal = clamp(S.dailyGoal + (act === 'goal+' ? 1 : -1), 1, 60); save(); renderDaily(); }
   else if (act === 'resume') goto(ST.last.page);
   else if (act === 'add') openAddSurah();
-  else if (act === 'quick') { if (!ST.dailySurahs.includes(n)) ST.dailySurahs.push(n); save(); renderDaily(); }
   else if (act === 'read') goto(surahPage(n));
   else if (act === 'listen') { goto(surahPage(n)); playFrom(n, 1); }
   else if (act === 'done') { setSurahDone(n, !surahDoneOn(n)); save(); renderDaily(); }
