@@ -1,4 +1,4 @@
-# Mushaf — Indo-Pak Quran reader (large text + 15-line mushaf)
+# Tilawat — Indo-Pak Quran reader (15-line mushaf + big text)
 
 A personal Quran reader in the familiar **Indo-Pak (Nastaleeq) handwriting**, with two ways to read:
 
@@ -27,6 +27,18 @@ python -m http.server 5188
 ```
 
 Then open <http://localhost:5188>. To install on a phone, open the hosted copy in Chrome (Android) or Safari (iPhone) and choose *Add to Home Screen* / *Install app*.
+
+## Android app (APK)
+
+`android/` is a small Android project that bundles this whole web app as assets inside a full-screen WebView, so the APK works offline and does not depend on the website. Build it with JDK 17 and the Android SDK:
+
+```bash
+cd android
+export TILAWAT_KEYSTORE=/path/to/tilawat-release.jks TILAWAT_STORE_PASS=...   # your signing key
+gradle assembleRelease            # -> app/build/outputs/apk/release/app-release.apk
+```
+
+Keep the signing key safe: updates must be signed with the same key. The key is not in the repo. Sideloading needs "Install unknown apps" enabled on the phone.
 
 ## Data
 

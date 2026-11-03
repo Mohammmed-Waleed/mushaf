@@ -1,6 +1,6 @@
 {
-  "name": "Mushaf — Quran reader",
-  "short_name": "Mushaf",
+  "name": "Tilawat — Quran reader",
+  "short_name": "Tilawat",
   "description": "Indo-Pak Quran reader: large text or 15-line mushaf, sura and para index, bookmarks, daily surah, audio.",
   "start_url": "./index.html",
   "scope": "./",

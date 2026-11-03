@@ -536,7 +536,7 @@ async function openAyah(s, a) {
     $('#shClose').onclick = () => $('#scrim').click();
     $('#shPlay').onclick = () => { closeSheet(); playFrom(s, a); };
     $('#shCopy').onclick = async () => { await navigator.clipboard?.writeText(shareText(s, a, trs)); toast('Copied'); };
-    $('#shShare').onclick = async () => { const text = shareText(s, a, trs); if (navigator.share) { try { await navigator.share({ text }); } catch {} } else { await navigator.clipboard?.writeText(text); toast('Copied'); } };
+    $('#shShare').onclick = async () => { const text = shareText(s, a, trs); if (!(await nativeShare({ text }))) { await navigator.clipboard?.writeText(text); toast('Copied'); } };
     $('#shBm').onclick = () => bmEditor(s, a);
     if (bm) bmEditor(s, a);
   });
@@ -815,8 +815,16 @@ function renderSaved() {
 }
 
 /* ───────────── settings ───────────── */
+// Opens the system share sheet: the Android app's bridge when running inside the APK, the Web Share API in a browser.
+// Resolves false when there is no share sheet, so callers can fall back to copying.
+async function nativeShare({ title, text, url }) {
+  if (window.AndroidApp) { AndroidApp.share([text, url].filter(Boolean).join('\n')); return true; }
+  if (!navigator.share) return false;
+  try { await navigator.share({ title, text, url }); } catch {}
+  return true;
+}
 const APP_URL = 'https://mohammmed-waleed.github.io/mushaf/';
-const SHARE_TEXT = 'Mushaf — a free Quran reader in the familiar Indo-Pak 15-line script, with bookmarks, daily surahs, audio and search. Works offline.';
+const SHARE_TEXT = 'Tilawat — a free Quran reader in the familiar Indo-Pak 15-line script, with bookmarks, daily surahs, audio and search. Works offline.';
 async function copyLink() {
   try { await navigator.clipboard.writeText(APP_URL); toast('Link copied'); }
   catch { prompt('Copy this link:', APP_URL); }
@@ -848,8 +856,7 @@ function renderSettings() {
   on('#sRep', 'change', e => { S.repeat = +e.target.value; save(); });
   on('#sGoal', 'change', e => { S.dailyGoal = clamp(+e.target.value || 1, 1, 60); save(); });
   on('#sShare', 'click', async () => {
-    if (navigator.share) { try { await navigator.share({ title: 'Mushaf — Quran reader', text: SHARE_TEXT, url: APP_URL }); } catch {} }
-    else copyLink();   // no system share sheet (e.g. a desktop browser): copy the link instead
+    if (!(await nativeShare({ title: 'Tilawat — Quran reader', text: SHARE_TEXT, url: APP_URL }))) copyLink();   // no system share sheet (e.g. a desktop browser): copy the link instead
   });
   on('#sRst', 'click', () => { if (confirm('Reset khatam progress to 0?')) { ST.khatam = []; save(); renderSettings(); } });
   on('#sExp', 'click', () => {
@@ -889,7 +896,13 @@ async function boot() {
   await new Promise(r => setTimeout(r, Math.max(0, 1100 - (Date.now() - t0))));
   $('#boot').classList.add('off');
   setTimeout(() => $('#boot').remove(), 400);
-  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !window.AndroidApp) navigator.serviceWorker.register('sw.js').catch(() => {});
+  // Android back button (APK): close a sheet, or return to the reader, before leaving the app
+  window.__back = () => {
+    if (!$('#sheet').hidden) { $('#scrim').click(); return true; }
+    if (!$('#v-read').classList.contains('on')) { show('read'); return true; }
+    return false;
+  };
   window.__mushaf = { goto, render, ST, AY, PAGES };
 }
 boot();

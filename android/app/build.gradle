@@ -1,0 +1,64 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.waleed.tilawat'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'com.waleed.tilawat'
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName '1.0'
+    }
+
+    // The release key lives outside the repo; its path and password come from the environment.
+    signingConfigs {
+        release {
+            def ks = System.getenv('TILAWAT_KEYSTORE')
+            if (ks) {
+                storeFile file(ks)
+                storePassword System.getenv('TILAWAT_STORE_PASS')
+                keyAlias 'tilawat'
+                keyPassword System.getenv('TILAWAT_STORE_PASS')
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    lint {
+        checkReleaseBuilds false
+    }
+
+    // The app is the website in ../.. bundled as assets, so it runs fully offline.
+    sourceSets {
+        main {
+            assets.srcDirs = [layout.buildDirectory.dir('web').get().asFile]
+        }
+    }
+}
+
+dependencies {
+    implementation 'androidx.webkit:webkit:1.12.1'
+}
+
+def syncWeb = tasks.register('syncWeb', Copy) {
+    from(rootProject.projectDir.parentFile) {
+        include 'index.html', 'manifest.webmanifest', 'css/**', 'js/**', 'fonts/**', 'data/**', 'icons/**'
+    }
+    into layout.buildDirectory.dir('web')
+}
+tasks.matching { it.name.endsWith('Assets') }.configureEach { dependsOn syncWeb }
