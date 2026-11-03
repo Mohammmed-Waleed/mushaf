@@ -45,6 +45,7 @@ ST.settings = Object.assign({}, DEF.settings, savedSettings);
 if (savedSettings.fsv !== 3) { ST.settings.fontSize = DEF.settings.fontSize; ST.settings.fsv = 3; }   // big-text size is fixed at 26px
 if (savedSettings.dv !== 1) { ST.settings.view = 'mushaf'; ST.settings.dv = 1; }                       // 15-line is the default view
 ST.settings.theme = 'light';                                                                          // light theme only
+ST.settings.zoom = 1; ST.settings.fitPage = true; ST.settings.spread = true;   // whole page always fits the screen; two pages side by side on wide screens
 let saveT;
 const save = () => { clearTimeout(saveT); saveT = setTimeout(() => { try { localStorage.setItem('mushaf.v1', JSON.stringify(ST)); } catch {} }, 250); };
 
@@ -823,10 +824,6 @@ function renderSettings() {
   $('#setBody').innerHTML = `
     <h2>Settings</h2>
     <h3>Reading</h3>
-    <label class="f">View<select id="sView">${opt('mushaf', S.view, '15-line mushaf pages')}${opt('flow', S.view, 'Big text (swipe pages)')}</select></label>
-    <label class="f">Page size (15-line mushaf)<input type="range" id="sZoom" min="0.7" max="1.6" step="0.05" value="${S.zoom}"></label>
-    <label class="f">Fit whole page on screen (15-line)<input type="checkbox" id="sFit" ${S.fitPage ? 'checked' : ''}></label>
-    <label class="f">Two-page spread on wide screens (15-line)<input type="checkbox" id="sSpread" ${S.spread ? 'checked' : ''}></label>
     <label class="f">Translation<select id="sTr">${opt('en', S.tr, 'English (Saheeh Intl)')}${opt('ur', S.tr, 'Urdu (Jalandhry)')}${opt('both', S.tr, 'English + Urdu')}${opt('none', S.tr, 'None')}</select></label>
     <h3>Audio</h3>
     <label class="f">Reciter<select id="sRec">${Object.entries(RECITERS).map(([k, v]) => opt(k, S.reciter, v)).join('')}</select></label>
@@ -840,10 +837,6 @@ function renderSettings() {
     <h3>About</h3>
     <p class="muted sm">15-line Indo-Pak mushaf (610 pages, Qudratullah layout) with Hanafi Nastaleeq fonts from the <a href="https://qul.tarteel.ai" target="_blank" rel="noopener">Quranic Universal Library</a> by Tarteel. Translations via <a href="https://quran.com" target="_blank" rel="noopener">Quran.com</a>; audio streamed from <a href="https://everyayah.com" target="_blank" rel="noopener">EveryAyah</a>. Everything you save stays on this device.</p>`;
   const on = (id, ev, fn) => $(id).addEventListener(ev, fn);
-  on('#sView', 'change', e => { S.view = e.target.value; save(); });
-  on('#sZoom', 'change', e => { S.zoom = +e.target.value; save(); });
-  on('#sFit', 'change', e => { S.fitPage = e.target.checked; save(); });
-  on('#sSpread', 'change', e => { S.spread = e.target.checked; save(); });
   on('#sTr', 'change', e => { S.tr = e.target.value; save(); });
   on('#sRec', 'change', e => { S.reciter = e.target.value; save(); });
   on('#sRep', 'change', e => { S.repeat = +e.target.value; save(); });
