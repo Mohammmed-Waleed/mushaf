@@ -815,6 +815,12 @@ function renderSaved() {
 }
 
 /* ───────────── settings ───────────── */
+const APP_URL = 'https://mohammmed-waleed.github.io/mushaf/';
+const SHARE_TEXT = 'Mushaf — a free Quran reader in the familiar Indo-Pak 15-line script, with bookmarks, daily surahs, audio and search. Works offline.';
+async function copyLink() {
+  try { await navigator.clipboard.writeText(APP_URL); toast('Link copied'); }
+  catch { prompt('Copy this link:', APP_URL); }
+}
 function renderSettings() {
   const S = ST.settings;
   const opt = (v, cur, label) => `<option value="${v}" ${v == cur ? 'selected' : ''}>${label}</option>`;
@@ -827,6 +833,17 @@ function renderSettings() {
     <label class="f">Repeat each ayah<select id="sRep">${[1, 2, 3, 5, 10].map(n => opt(n, S.repeat, n === 1 ? 'Once' : n + ' times')).join('')}</select></label>
     <h3>Daily</h3>
     <label class="f">Daily page goal<input type="number" id="sGoal" min="1" max="60" value="${S.dailyGoal}"></label>
+    <h3>Share the app</h3>
+    <p class="muted sm" style="margin-top:0">Know someone who would like it? Send them the link — it installs on their phone like an app and works offline.</p>
+    <div class="btns" style="margin-top:0">
+      <button class="btn" id="sShare">Share app…</button>
+      <a class="btn ghost" id="shWa" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(SHARE_TEXT + ' ' + APP_URL)}">WhatsApp</a>
+      <a class="btn ghost" target="_blank" rel="noopener" href="https://t.me/share/url?url=${encodeURIComponent(APP_URL)}&text=${encodeURIComponent(SHARE_TEXT)}">Telegram</a>
+      <a class="btn ghost" target="_blank" rel="noopener" href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(APP_URL)}">Facebook</a>
+      <a class="btn ghost" target="_blank" rel="noopener" href="https://twitter.com/intent/tweet?url=${encodeURIComponent(APP_URL)}&text=${encodeURIComponent(SHARE_TEXT)}">X</a>
+      <a class="btn ghost" href="mailto:?subject=${encodeURIComponent('Mushaf — Quran reader')}&body=${encodeURIComponent(SHARE_TEXT + '\n\n' + APP_URL)}">Email</a>
+      <button class="btn ghost" id="sCopy">Copy link</button>
+    </div>
     <h3>Your data</h3>
     <div class="muted sm">Khatam progress: ${ST.khatam.length}/${TOTAL_PAGES} pages · ${ST.bms.length} bookmarks · ${Object.keys(ST.read).length} days read</div>
     <div class="btns"><button class="btn ghost sm" id="sExp">Export backup</button><button class="btn ghost sm" id="sImp">Import backup</button><button class="btn danger sm" id="sRst">Reset khatam</button></div>
@@ -838,6 +855,11 @@ function renderSettings() {
   on('#sRec', 'change', e => { S.reciter = e.target.value; save(); });
   on('#sRep', 'change', e => { S.repeat = +e.target.value; save(); });
   on('#sGoal', 'change', e => { S.dailyGoal = clamp(+e.target.value || 1, 1, 60); save(); });
+  on('#sShare', 'click', async () => {
+    if (navigator.share) { try { await navigator.share({ title: 'Mushaf — Quran reader', text: SHARE_TEXT, url: APP_URL }); } catch {} }
+    else copyLink();   // no system share sheet (desktop): copy the link and use the buttons beside it
+  });
+  on('#sCopy', 'click', copyLink);
   on('#sRst', 'click', () => { if (confirm('Reset khatam progress to 0?')) { ST.khatam = []; save(); renderSettings(); } });
   on('#sExp', 'click', () => {
     const a = document.createElement('a');

@@ -171,3 +171,4 @@ input[type=range]{accent-color:var(--accent);width:150px}
 .orn.tl{top:-9px;left:-9px}.orn.tr{top:-9px;right:-9px}.orn.bl{bottom:-9px;left:-9px}.orn.br{bottom:-9px;right:-9px}
 .pg.cover .orn.tl{top:2px;left:2px}.pg.cover .orn.tr{top:2px;right:2px}.pg.cover .orn.bl{bottom:2px;left:2px}.pg.cover .orn.br{bottom:2px;right:2px}
 .tail{display:inline-block;width:0;height:2.2em;vertical-align:top}
+a.btn{display:inline-block;text-decoration:none;text-align:center}
