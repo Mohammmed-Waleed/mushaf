@@ -1,0 +1,14 @@
+{
+  "name": "Mushaf — 15-line Quran",
+  "short_name": "Mushaf",
+  "description": "15-line Indo-Pak Quran reader with bookmarks, daily surah, audio and search.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#efe7d3",
+  "theme_color": "#1f6b52",
+  "icons": [
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

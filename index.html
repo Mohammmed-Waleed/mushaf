@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mushaf — 15-line Quran</title>
+<meta name="description" content="A 15-line Indo-Pak Quran reader with bookmarks, a daily surah, audio and search.">
+<meta name="theme-color" content="#f6f0e1">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Nastaliq+Urdu:wght@400;500&display=swap">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div id="app">
+  <header id="topbar">
+    <button id="btnMenu" class="ib" aria-label="Go to page"><span id="ttlPage">Page 1</span></button>
+    <div id="ttlMid"><b id="ttlSurah">Al-Fatihah</b><small id="ttlJuz">Juz 1</small></div>
+    <div class="grp">
+      <button id="btnBm" class="ib" aria-label="Bookmark this page" title="Bookmark page (B)">
+        <svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4.5L6 21z"/></svg>
+      </button>
+      <button id="btnLook" class="ib" aria-label="Text size and view" title="Text size and view" style="font-weight:700;font-size:17px">Aa</button>
+      <button id="btnTheme" class="ib" aria-label="Change theme" title="Theme">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <section id="v-read" class="view on">
+      <div id="stage"></div>
+      <button id="navPrev" class="edge l" aria-label="Previous page">‹</button>
+      <button id="navNext" class="edge r" aria-label="Next page">›</button>
+    </section>
+
+    <section id="v-surah" class="view">
+      <div class="wrap">
+        <h2>Sura index</h2>
+        <input id="q" type="search" placeholder="Search: sura, 2:255, page 300, Arabic or English…" autocomplete="off">
+        <div id="qres"></div>
+        <div id="surahList"></div>
+      </div>
+    </section>
+
+    <section id="v-para" class="view"><div class="wrap"><h2>Para (Juz) index</h2><div id="paraList"></div></div></section>
+
+    <section id="v-daily" class="view"><div class="wrap" id="dailyBody"></div></section>
+    <section id="v-saved" class="view"><div class="wrap" id="savedBody"></div></section>
+    <section id="v-set" class="view"><div class="wrap" id="setBody"></div></section>
+  </main>
+
+  <div id="player" hidden>
+    <div class="pinfo"><b id="pTitle"></b><small id="pSub"></small></div>
+    <button id="pPrev" class="ib" aria-label="Previous ayah">⏮</button>
+    <button id="pPlay" class="ib big" aria-label="Pause">⏸</button>
+    <button id="pNext" class="ib" aria-label="Next ayah">⏭</button>
+    <button id="pStop" class="ib" aria-label="Stop">✕</button>
+  </div>
+
+  <nav id="tabs">
+    <button data-v="read" class="on"><svg viewBox="0 0 24 24"><path d="M4 5c3-1 6-1 8 1 2-2 5-2 8-1v13c-3-1-6-1-8 1-2-2-5-2-8-1z"/><path d="M12 6v13"/></svg><span>Read</span></button>
+    <button data-v="surah"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span>Sura</span></button>
+    <button data-v="para"><svg viewBox="0 0 24 24"><path d="M5 4h14v16H5zM9 4v16M12 9h4M12 13h4"/></svg><span>Para</span></button>
+    <button data-v="daily"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg><span>Daily</span></button>
+    <button data-v="saved"><svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4.5L6 21z"/></svg><span>Saved</span></button>
+    <button data-v="set"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/></svg><span>Settings</span></button>
+  </nav>
+</div>
+
+<div id="scrim" hidden></div>
+<div id="sheet" hidden></div>
+<div id="toast" hidden></div>
+<div id="boot"><div><div class="bootmark">﷽</div><p id="bootmsg">Loading the Quran…</p></div></div>
+
+<script src="js/app.js" defer></script>
+</body>
+</html>
