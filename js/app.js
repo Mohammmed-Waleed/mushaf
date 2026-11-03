@@ -11,7 +11,6 @@ const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')
 const dayNum = d => Math.floor((Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())) / 864e5);
 const TOTAL_PAGES = 610;
 const COLORS = ['#1f6b52', '#c9892b', '#b3372b', '#2f6fb3', '#7a4fa0'];
-const THEMES = ['light', 'sepia', 'dark', 'black'];
 const RECITERS = {
   'Alafasy_128kbps': 'Mishary Alafasy',
   'Husary_128kbps': 'Mahmoud Khalil Al-Husary',
@@ -26,20 +25,26 @@ const JUZ = [[1,1],[2,142],[2,253],[3,93],[4,24],[4,148],[5,82],[6,111],[7,88],[
 
 /* ───────────── persistent state ───────────── */
 const DEF = {
-  settings: { theme: 'light', view: 'flow', fontSize: 26, fsv: 3, zoom: 1, fitPage: true, spread: true, tr: 'en', reciter: 'Alafasy_128kbps', repeat: 1,
+  settings: { theme: 'light', view: 'mushaf', dv: 1, fontSize: 26, fsv: 3, zoom: 1, fitPage: true, spread: true, tr: 'en', reciter: 'Alafasy_128kbps', repeat: 1,
               dailyGoal: 2, dailyMode: 'rotate', fixedSurah: 36, fridayKahf: true },
   last: { page: 1, s: 1, a: 1 },
   bms: [],
   read: {},        // 'YYYY-MM-DD' -> [pages read that day]
   khatam: [],      // pages read in the current khatam cycle
   khatams: 0,
-  surahDone: {},   // 'YYYY-MM-DD' -> true
+  surahDone: {},   // (old) 'YYYY-MM-DD' -> true
+  dailySurahs: [], // surahs the user wants to recite every day
+  sdone: {},       // 'YYYY-MM-DD' -> [surah numbers recited that day]
+  doneDays: {},    // 'YYYY-MM-DD' -> true once the whole daily goal was met
 };
 let ST;
 try { ST = JSON.parse(localStorage.getItem('mushaf.v1') || 'null'); } catch { ST = null; }
 ST = Object.assign(structuredClone(DEF), ST || {});
-ST.settings = Object.assign({}, DEF.settings, ST.settings);
-if (ST.settings.fsv !== 3) { ST.settings.fontSize = DEF.settings.fontSize; ST.settings.fsv = 3; }  // large-text size is fixed at 26px
+const savedSettings = ST.settings;   // what was stored, before defaults are filled in (used for one-time migrations)
+ST.settings = Object.assign({}, DEF.settings, savedSettings);
+if (savedSettings.fsv !== 3) { ST.settings.fontSize = DEF.settings.fontSize; ST.settings.fsv = 3; }   // big-text size is fixed at 26px
+if (savedSettings.dv !== 1) { ST.settings.view = 'mushaf'; ST.settings.dv = 1; }                       // 15-line is the default view
+ST.settings.theme = 'light';                                                                          // light theme only
 let saveT;
 const save = () => { clearTimeout(saveT); saveT = setTimeout(() => { try { localStorage.setItem('mushaf.v1', JSON.stringify(ST)); } catch {} }, 250); };
 
@@ -351,12 +356,13 @@ function renderFlow(startSub = 0) {
 // dir > 0 = forward (next screen), dir < 0 = back
 function flowStep(dir) {
   if (dir > 0) {
-    if (flowSub < flowCount - 1) return setSub(flowSub + 1);
-    if (cur < TOTAL_PAGES) { cur++; hlKey = null; renderFlow(0); }
+    if (flowSub < flowCount - 1) { setSub(flowSub + 1); return true; }
+    if (cur < TOTAL_PAGES) { animateTurn(1, () => { cur++; hlKey = null; renderFlow(0); }); return true; }
   } else {
-    if (flowSub > 0) return setSub(flowSub - 1);
-    if (cur > 1) { cur--; hlKey = null; renderFlow('last'); }
+    if (flowSub > 0) { setSub(flowSub - 1); return true; }
+    if (cur > 1) { animateTurn(-1, () => { cur--; hlKey = null; renderFlow('last'); }); return true; }
   }
+  return false;
 }
 // finger-follow swipe
 stage.addEventListener('touchstart', e => {
@@ -374,52 +380,98 @@ function endDrag() {
   if (!flowDrag) return;
   const { dx, t } = flowDrag; flowDrag = null;
   const fast = Date.now() - t < 350;
-  if (Math.abs(dx) > (fast ? 40 : flowW * 0.25)) { setSub(flowSub, true); flowStep(dx > 0 ? 1 : -1); }
-  else setSub(flowSub, true);
+  if (Math.abs(dx) > (fast ? 40 : flowW * 0.25) && flowStep(dx > 0 ? 1 : -1)) return;
+  setSub(flowSub, true);
 }
 stage.addEventListener('touchend', endDrag);
 stage.addEventListener('touchcancel', endDrag);
 
 function setView(v) {
+  if (ST.settings.view === v) return;
   ST.settings.view = v; save();
-  render();
+  render(); fadeIn();
 }
 function openLook() {
   const S = ST.settings;
   openSheet(`<h2>Reading view</h2>
-    <div class="seg" id="lkView"><button data-v="flow" class="${S.view === 'flow' ? 'on' : ''}">Big text</button><button data-v="mushaf" class="${S.view === 'mushaf' ? 'on' : ''}">15-line mushaf</button></div>
-    <h3>Theme</h3>
-    <div class="seg" id="lkTheme">${THEMES.map(t => `<button data-t="${t}" class="${S.theme === t ? 'on' : ''}">${t[0].toUpperCase() + t.slice(1)}</button>`).join('')}</div>`, sh => {
+    <div class="seg" id="lkView"><button data-v="mushaf" class="${S.view === 'mushaf' ? 'on' : ''}">15-line mushaf</button><button data-v="flow" class="${S.view === 'flow' ? 'on' : ''}">Big text</button></div>
+    <p class="muted sm">15-line mushaf: fixed pages like the printed copy. Big text: the same pages in larger writing, one screen at a time.</p>`, () => {
     $$('#lkView button').forEach(b => b.onclick = () => { setView(b.dataset.v); $$('#lkView button').forEach(x => x.classList.toggle('on', x === b)); });
-    $$('#lkTheme button').forEach(b => b.onclick = () => { setTheme(b.dataset.t); $$('#lkTheme button').forEach(x => x.classList.toggle('on', x === b)); });
   });
 }
 $('#btnLook').onclick = openLook;
 
+/* page-turn animation: the old page slides away while the new one slides in from the other side
+   (right-to-left book: going forward brings the next page in from the left) */
+const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+const EASE = 'cubic-bezier(.22,.8,.3,1)';
+function fadeIn() {
+  if (reduceMotion()) return;
+  stage.animate([{ opacity: 0, transform: 'translateY(10px) scale(.985)' }, { opacity: 1, transform: 'none' }], { duration: 260, easing: EASE });
+}
+function animateTurn(dir, fn, dx = 0) {
+  if (reduceMotion()) return fn();
+  const rv = readView.getBoundingClientRect(), sign = dir > 0 ? 1 : -1;
+  const wrap = document.createElement('div');
+  Object.assign(wrap.style, { position: 'fixed', left: rv.left + 'px', top: rv.top + 'px', width: rv.width + 'px', height: rv.height + 'px', overflow: 'hidden', pointerEvents: 'none', zIndex: 5, background: 'var(--bg)' });
+  const g = stage.cloneNode(true);
+  g.removeAttribute('id');
+  g.style.width = stage.offsetWidth + 'px';
+  g.style.transition = 'none';
+  g.style.transform = `translate(${dx}px, ${-readView.scrollTop}px)`;
+  wrap.append(g); document.body.append(wrap);
+  stage.style.transition = ''; stage.style.transform = '';
+  fn();
+  wrap.animate([{ transform: 'translateX(0)', opacity: 1 }, { transform: `translateX(${sign * 24}%)`, opacity: 0 }], { duration: 340, easing: 'cubic-bezier(.4,0,.2,1)', fill: 'forwards' }).onfinish = () => wrap.remove();
+  stage.animate([{ transform: `translateX(${-sign * 24}%)`, opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 340, easing: EASE });
+}
+
 function goto(page, o = {}) {
+  const from = cur, wasRead = $('#v-read').classList.contains('on');
   cur = clamp(page, 1, TOTAL_PAGES);
   focusPage = cur;
   if (o.k) hlKey = o.k; else if (!o.keep) hlKey = null;
   show('read', true);
   render();
+  if (!o.quiet && (!wasRead || cur !== from)) fadeIn();
   if (o.k) {
     focusPage = cur = AY[o.k].page;
     if (flowMode()) showKey(o.k);
     else { const w = $(`.w[data-k="${o.k}"]`, stage); if (w) w.scrollIntoView({ block: 'center', inline: 'nearest' }); syncTop(); }
   }
 }
-const step = dir => flowMode() ? flowStep(dir) : goto(cur + dir * (spreadOn ? 2 : 1), { keep: false });
+function step(dir, dx = 0) {
+  if (flowMode()) return flowStep(dir);
+  const to = clamp(cur + dir * (spreadOn ? 2 : 1), 1, TOTAL_PAGES);
+  if (to === cur) return false;
+  animateTurn(dir, () => goto(to, { quiet: true }), dx);
+  return true;
+}
 $('#navNext').onclick = () => step(1);
 $('#navPrev').onclick = () => step(-1);
 
-// swipe (RTL book: swipe right → next page)
-let tx = 0, ty = 0, tt = 0;
-stage.addEventListener('touchstart', e => { tx = e.touches[0].clientX; ty = e.touches[0].clientY; tt = Date.now(); }, { passive: true });
-stage.addEventListener('touchend', e => {
-  if (flowMode() || ST.settings.zoom > 1.02) return;
-  const dx = e.changedTouches[0].clientX - tx, dy = e.changedTouches[0].clientY - ty;
-  if (Math.abs(dx) > 70 && Math.abs(dy) < 60 && Date.now() - tt < 600) step(dx > 0 ? 1 : -1);
+// 15-line view: the page follows your finger, then turns (swipe right = next page)
+let tx = 0, ty = 0, tt = 0, mDrag = false;
+stage.addEventListener('touchstart', e => { if (e.touches.length !== 1) return; tx = e.touches[0].clientX; ty = e.touches[0].clientY; tt = Date.now(); mDrag = false; }, { passive: true });
+stage.addEventListener('touchmove', e => {
+  if (flowMode() || ST.settings.zoom > 1.02 || e.touches.length !== 1) return;
+  const dx = e.touches[0].clientX - tx, dy = e.touches[0].clientY - ty;
+  if (!mDrag && (Math.abs(dx) < 12 || Math.abs(dx) < Math.abs(dy) * 1.2)) return;
+  mDrag = true;
+  stage.style.transition = 'none';
+  stage.style.transform = `translateX(${dx}px)`;
 }, { passive: true });
+function endMush(e) {
+  if (!mDrag) return;
+  mDrag = false;
+  const dx = e.changedTouches[0].clientX - tx, fast = Date.now() - tt < 350;
+  if (Math.abs(dx) > (fast ? 45 : readView.clientWidth * 0.25) && step(dx > 0 ? 1 : -1, dx)) return;
+  stage.style.transition = `transform .25s ${EASE}`;
+  stage.style.transform = '';
+  setTimeout(() => { stage.style.transition = ''; }, 270);
+}
+stage.addEventListener('touchend', endMush);
+stage.addEventListener('touchcancel', endMush);
 addEventListener('keydown', e => {
   if (!$('#v-read').classList.contains('on') || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName) || !$('#sheet').hidden) return;
   if (e.key === 'ArrowLeft') step(1);
@@ -515,11 +567,9 @@ function toggleBm() {
   save(); syncTop();
 }
 $('#btnBm').onclick = toggleBm;
-$('#btnTheme').onclick = () => setTheme(THEMES[(THEMES.indexOf(ST.settings.theme) + 1) % THEMES.length]);
-function setTheme(t) {
-  ST.settings.theme = t; save();
-  document.documentElement.dataset.theme = t === 'light' ? '' : t;
-  $('meta[name=theme-color]').content = { light: '#efe7d3', sepia: '#d9c9a3', dark: '#14181a', black: '#000000' }[t];
+function setTheme() {
+  ST.settings.theme = 'light';
+  document.documentElement.removeAttribute('data-theme');
 }
 
 /* ───────────── go-to sheet ───────────── */
@@ -576,6 +626,19 @@ $('#pPrev').onclick = () => { const p = ORDER[idxOf(playKey) - 1]; if (p) { repL
 
 /* ───────────── reading tracking & daily logic ───────────── */
 let readT;
+const lastPage = n => AY[key(n, SUR[n - 1].n)].page;
+const surahDoneOn = (n, day = ymd(new Date())) => (ST.sdone[day] || []).includes(n);
+function setSurahDone(n, on, day = ymd(new Date())) {
+  const a = (ST.sdone[day] ||= []), i = a.indexOf(n);
+  if (on && i < 0) a.push(n); else if (!on && i >= 0) a.splice(i, 1);
+}
+const pagesToday = () => (ST.read[ymd(new Date())] || []).length;
+// A day is complete when the page goal is met and every surah on the daily list has been recited.
+function dayComplete() {
+  const day = ymd(new Date());
+  return pagesToday() >= ST.settings.dailyGoal && ST.dailySurahs.every(n => surahDoneOn(n, day));
+}
+function markDay() { if (dayComplete()) ST.doneDays[ymd(new Date())] = true; }
 function trackRead(pages) {
   clearTimeout(readT);
   readT = setTimeout(() => {
@@ -588,63 +651,89 @@ function trackRead(pages) {
       if (!ST.khatam.includes(p)) { ST.khatam.push(p); changed = true; }
     }
     if (ST.khatam.length >= TOTAL_PAGES) { ST.khatams++; ST.khatam = []; toast('Khatam complete — Alhamdulillah!'); }
-    if (changed) save();
+    // a daily surah counts as recited once every page of it has been read today
+    for (const n of ST.dailySurahs) {
+      if (surahDoneOn(n, day)) continue;
+      let all = true;
+      for (let p = surahPage(n); p <= lastPage(n); p++) if (!r.includes(p)) { all = false; break; }
+      if (all) { setSurahDone(n, true, day); changed = true; toast(`${surahName(n)} done for today ✓`); }
+    }
+    if (changed) { markDay(); save(); }
   }, 6000);
 }
-const pagesToday = () => (ST.read[ymd(new Date())] || []).length;
-function dayDone(d) { const k = ymd(d); return (ST.read[k] || []).length >= ST.settings.dailyGoal || !!ST.surahDone[k]; }
 function streak() {
   const d = new Date(); let n = 0;
-  if (!dayDone(d)) d.setDate(d.getDate() - 1);
-  while (dayDone(d)) { n++; d.setDate(d.getDate() - 1); }
+  if (!ST.doneDays[ymd(d)]) d.setDate(d.getDate() - 1);
+  while (ST.doneDays[ymd(d)]) { n++; d.setDate(d.getDate() - 1); }
   return n;
 }
-function surahOfDay(d = new Date()) {
-  if (d.getDay() === 5 && ST.settings.fridayKahf) return 18;
-  if (ST.settings.dailyMode === 'fixed') return ST.settings.fixedSurah;
-  return dayNum(d) % 114 + 1;
-}
-function ayahOfDay(d = new Date()) { return ORDER[(Math.imul(dayNum(d) + 11, 2654435761) >>> 0) % ORDER.length]; }
 function hijri() { try { return new Intl.DateTimeFormat('en-u-ca-islamic-umalqura', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date()); } catch { return ''; } }
+const QUICK = [36, 67, 18, 55, 56, 112];   // Yaseen, Al-Mulk, Al-Kahf, Ar-Rahman, Al-Waqiah, Al-Ikhlas
 
-async function renderDaily() {
-  const d = new Date(), sd = surahOfDay(d), S = SUR[sd - 1], done = !!ST.surahDone[ymd(d)];
-  const [aks] = [ayahOfDay(d)], ay = AY[aks];
-  const goal = ST.settings.dailyGoal, pt = pagesToday();
+function renderDaily() {
+  markDay(); save();
+  const d = new Date(), goal = ST.settings.dailyGoal, pt = pagesToday();
   const pct = Math.min(100, Math.round(pt / goal * 100));
   const kp = Math.round(ST.khatam.length / TOTAL_PAGES * 100);
-  const want = ST.settings.tr === 'both' ? ['en', 'ur'] : ST.settings.tr === 'none' ? ['en'] : [ST.settings.tr];
-  const trs = []; for (const l of want) trs.push([l, (await loadTr(l))[ay.s - 1][ay.a - 1]]);
-  const kahf = d.getDay() === 5 && ST.settings.fridayKahf;
+  const list = ST.dailySurahs, doneN = list.filter(n => surahDoneOn(n)).length;
+  const lp = ST.last.page, [ls, la] = PGINFO[lp].first;
+  const complete = dayComplete();
+  const status = complete ? 'Today is complete — well done!'
+    : [pt < goal ? `${goal - pt} more page${goal - pt > 1 ? 's' : ''}` : '', list.length && doneN < list.length ? `${list.length - doneN} surah${list.length - doneN > 1 ? 's' : ''} to recite` : ''].filter(Boolean).join(' · ') + ' to go';
   $('#dailyBody').innerHTML = `
     <h2>Today</h2>
     <div class="muted sm" style="margin-top:-8px;margin-bottom:12px">${d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}${hijri() ? ' · ' + esc(hijri()) : ''}</div>
-    <div class="card row">
-      <div class="ring" style="--p:${pct}"><i><span>${pt}/${goal}<small>pages</small></span></i></div>
-      <div class="sp"><b>Daily reading goal</b>
-        <div class="muted sm">${pt >= goal ? 'Goal reached — well done!' : `${goal - pt} more page${goal - pt > 1 ? 's' : ''} to go`}</div>
-        <div class="row sm" style="margin-top:8px"><span class="pill">🔥 ${streak()} day streak</span><span class="pill">Khatam ${kp}%${ST.khatams ? ` · ${ST.khatams}×` : ''}</span></div></div>
-    </div>
-    <h3>${kahf ? 'Friday · Surah Al-Kahf' : 'Surah of the day'}</h3>
     <div class="card">
-      <div class="row"><div class="num">${sd}</div><div class="sp"><b>${esc(S.en)}</b><div class="muted sm">${esc(S.tr)} · ${S.n} ayahs · ${S.place} · page ${surahPage(sd)}</div></div><div class="ar" style="font-size:30px">${esc(S.ar)}</div></div>
-      <div class="btns"><button class="btn" id="dRead">Read now</button><button class="btn ghost" id="dListen">▶ Listen</button>
-      <button class="btn ${done ? '' : 'ghost'}" id="dDone">${done ? '✓ Completed today' : 'Mark as read'}</button></div>
+      <div class="row">
+        <div class="ring" style="--p:${pct}"><i><span>${pt}/${goal}<small>pages</small></span></i></div>
+        <div class="sp"><b>Daily goal</b>
+          <div class="muted sm">${esc(status)}</div>
+          <div class="row" style="margin-top:8px;gap:6px"><button class="ib" data-act="goal-" aria-label="Fewer pages" style="border:1px solid var(--line);min-width:34px;min-height:34px;padding:0">−</button><span class="sm"><b>${goal}</b> page${goal > 1 ? 's' : ''} / day</span><button class="ib" data-act="goal+" aria-label="More pages" style="border:1px solid var(--line);min-width:34px;min-height:34px;padding:0">+</button></div></div>
+      </div>
+      <div class="row sm" style="margin-top:12px"><span class="pill">🔥 ${streak()} day streak</span><span class="pill">Khatam ${kp}%${ST.khatams ? ` · ${ST.khatams}×` : ''}</span></div>
+      <div class="row" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line)">
+        <div class="sp"><b>Continue reading</b><div class="muted sm">Page ${lp} · ${esc(surahName(ls))} · Para ${juzOf(ls, la)}</div></div>
+        <button class="btn" data-act="resume">Resume</button></div>
     </div>
-    <h3>Ayah of the day</h3>
-    <div class="card"><div class="muted sm">${esc(surahName(ay.s))} ${ay.s}:${ay.a} · page ${ay.page}</div>
-      <div class="big-ar">${esc(ay.text)} <span style="color:var(--accent)">${esc(ay.marker)}</span></div>
-      ${trs.map(([l, t]) => l === 'en' ? `<p class="tr-en">${esc(t)}</p>` : `<p class="tr-ur">${esc(t)}</p>`).join('')}
-      <div class="btns"><button class="btn ghost" id="aOpen">Open in Mushaf</button><button class="btn ghost" id="aPlay">▶ Listen</button><button class="btn ghost" id="aBm">☆ Bookmark</button></div></div>
-    <h3>Continue reading</h3>
-    <div class="card row"><div class="sp"><b>Page ${ST.last.page}</b><div class="muted sm">${esc(surahName(PGINFO[ST.last.page].first[0]))} · Para ${juzOf(...PGINFO[ST.last.page].first)}</div></div><button class="btn" id="dCont">Resume</button></div>`;
-  $('#dRead').onclick = () => goto(surahPage(sd));
-  $('#dListen').onclick = () => { goto(surahPage(sd)); playFrom(sd, 1); };
-  $('#dDone').onclick = () => { if (ST.surahDone[ymd(d)]) delete ST.surahDone[ymd(d)]; else ST.surahDone[ymd(d)] = true; save(); renderDaily(); };
-  $('#aOpen').onclick = () => goto(ay.page, { k: aks });
-  $('#aPlay').onclick = () => { goto(ay.page, { k: aks }); playFrom(ay.s, ay.a); };
-  $('#aBm').onclick = () => { goto(ay.page, { k: aks }); openAyah(ay.s, ay.a).then(() => bmEditor(ay.s, ay.a)); };
-  $('#dCont').onclick = () => goto(ST.last.page);
+    <div class="row" style="margin:22px 0 8px"><h3 style="margin:0">Daily surahs${list.length ? ` · ${doneN}/${list.length}` : ''}</h3><span class="sp"></span><button class="btn sm" data-act="add">+ Add surah</button></div>
+    ${list.length ? list.map(n => {
+      const S = SUR[n - 1], done = surahDoneOn(n), pg = lastPage(n) - surahPage(n) + 1;
+      return `<div class="card" data-s="${n}">
+        <div class="row"><div class="num">${n}</div><div class="sp"><b>${esc(S.en)}</b><div class="muted sm">${S.n} ayahs · ${pg} page${pg > 1 ? 's' : ''} · from p.${surahPage(n)}</div></div><div class="ar" style="font-size:26px">${esc(S.ar)}</div></div>
+        <div class="btns"><button class="btn sm" data-act="read">Read</button><button class="btn ghost sm" data-act="listen">▶ Listen</button><button class="btn sm ${done ? '' : 'ghost'}" data-act="done">${done ? '✓ Done today' : 'Mark done'}</button><button class="btn ghost sm" data-act="rm" aria-label="Remove ${esc(S.en)}">Remove</button></div></div>`;
+    }).join('') : `<div class="card"><div class="muted sm">Add the surahs you want to recite every day. They reset each morning, and a surah is ticked automatically once you have read all its pages. Quick add:</div>
+      <div class="btns">${QUICK.map(n => `<button class="btn ghost sm" data-act="quick" data-s="${n}">${esc(SUR[n - 1].en)}</button>`).join('')}</div></div>`}`;
+}
+$('#dailyBody').addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const act = b.dataset.act, n = +(b.dataset.s || b.closest('[data-s]')?.dataset.s || 0);
+  const S = ST.settings;
+  if (act === 'goal-' || act === 'goal+') { S.dailyGoal = clamp(S.dailyGoal + (act === 'goal+' ? 1 : -1), 1, 60); save(); renderDaily(); }
+  else if (act === 'resume') goto(ST.last.page);
+  else if (act === 'add') openAddSurah();
+  else if (act === 'quick') { if (!ST.dailySurahs.includes(n)) ST.dailySurahs.push(n); save(); renderDaily(); }
+  else if (act === 'read') goto(surahPage(n));
+  else if (act === 'listen') { goto(surahPage(n)); playFrom(n, 1); }
+  else if (act === 'done') { setSurahDone(n, !surahDoneOn(n)); save(); renderDaily(); }
+  else if (act === 'rm') { ST.dailySurahs = ST.dailySurahs.filter(x => x !== n); save(); renderDaily(); }
+});
+function openAddSurah() {
+  const draw = (q = '') => {
+    const nq = normLat(q);
+    $('#asList').innerHTML = SUR.filter(s => !nq || normLat(s.en).includes(nq) || normLat(s.tr).includes(nq) || String(s.id) === nq || normAr(s.ar).includes(normAr(q)))
+      .map(s => { const on = ST.dailySurahs.includes(s.id); return `<div class="item" data-s="${s.id}"><div class="num">${s.id}</div><div class="sp"><b>${esc(s.en)}</b><div class="muted sm">${esc(s.tr)} · ${s.n} ayahs</div></div><div class="ar" style="font-size:20px">${esc(s.ar)}</div><span class="pill" style="${on ? 'background:var(--accent);color:var(--accent-ink);border-color:var(--accent)' : ''}">${on ? '✓ Added' : 'Add'}</span></div>`; }).join('');
+  };
+  openSheet(`<h2>Add surah to your daily list</h2><input type="search" id="asQ" placeholder="Search sura…" autocomplete="off"><div id="asList" style="margin-top:6px"></div><div class="btns"><button class="btn" id="asDone">Done</button></div>`, () => {
+    draw();
+    $('#asQ').oninput = e => draw(e.target.value);
+    $('#asList').onclick = e => {
+      const it = e.target.closest('.item'); if (!it) return;
+      const n = +it.dataset.s, i = ST.dailySurahs.indexOf(n);
+      if (i >= 0) ST.dailySurahs.splice(i, 1); else ST.dailySurahs.push(n);
+      save(); draw($('#asQ').value); renderDaily();
+    };
+    $('#asDone').onclick = () => $('#scrim').click();
+  });
 }
 
 /* ───────────── index & search ───────────── */
@@ -734,8 +823,7 @@ function renderSettings() {
   $('#setBody').innerHTML = `
     <h2>Settings</h2>
     <h3>Reading</h3>
-    <label class="f">Theme<select id="sTheme">${THEMES.map(t => opt(t, S.theme, t[0].toUpperCase() + t.slice(1))).join('')}</select></label>
-    <label class="f">View<select id="sView">${opt('flow', S.view, 'Big text (swipe pages)')}${opt('mushaf', S.view, '15-line mushaf pages')}</select></label>
+    <label class="f">View<select id="sView">${opt('mushaf', S.view, '15-line mushaf pages')}${opt('flow', S.view, 'Big text (swipe pages)')}</select></label>
     <label class="f">Page size (15-line mushaf)<input type="range" id="sZoom" min="0.7" max="1.6" step="0.05" value="${S.zoom}"></label>
     <label class="f">Fit whole page on screen (15-line)<input type="checkbox" id="sFit" ${S.fitPage ? 'checked' : ''}></label>
     <label class="f">Two-page spread on wide screens (15-line)<input type="checkbox" id="sSpread" ${S.spread ? 'checked' : ''}></label>
@@ -745,9 +833,6 @@ function renderSettings() {
     <label class="f">Repeat each ayah<select id="sRep">${[1, 2, 3, 5, 10].map(n => opt(n, S.repeat, n === 1 ? 'Once' : n + ' times')).join('')}</select></label>
     <h3>Daily</h3>
     <label class="f">Daily page goal<input type="number" id="sGoal" min="1" max="60" value="${S.dailyGoal}"></label>
-    <label class="f">Surah of the day<select id="sMode">${opt('rotate', S.dailyMode, 'Rotate through all 114')}${opt('fixed', S.dailyMode, 'Always the same surah')}</select></label>
-    <label class="f" id="fixRow" ${S.dailyMode === 'fixed' ? '' : 'hidden'}>Surah<select id="sFix">${SUR.map(s => opt(s.id, S.fixedSurah, `${s.id}. ${s.en}`)).join('')}</select></label>
-    <label class="f">Friday: Surah Al-Kahf<input type="checkbox" id="sKahf" ${S.fridayKahf ? 'checked' : ''}></label>
     <h3>Your data</h3>
     <div class="muted sm">Khatam progress: ${ST.khatam.length}/${TOTAL_PAGES} pages · ${ST.bms.length} bookmarks · ${Object.keys(ST.read).length} days read</div>
     <div class="btns"><button class="btn ghost sm" id="sExp">Export backup</button><button class="btn ghost sm" id="sImp">Import backup</button><button class="btn danger sm" id="sRst">Reset khatam</button></div>
@@ -755,7 +840,6 @@ function renderSettings() {
     <h3>About</h3>
     <p class="muted sm">15-line Indo-Pak mushaf (610 pages, Qudratullah layout) with Hanafi Nastaleeq fonts from the <a href="https://qul.tarteel.ai" target="_blank" rel="noopener">Quranic Universal Library</a> by Tarteel. Translations via <a href="https://quran.com" target="_blank" rel="noopener">Quran.com</a>; audio streamed from <a href="https://everyayah.com" target="_blank" rel="noopener">EveryAyah</a>. Everything you save stays on this device.</p>`;
   const on = (id, ev, fn) => $(id).addEventListener(ev, fn);
-  on('#sTheme', 'change', e => setTheme(e.target.value));
   on('#sView', 'change', e => { S.view = e.target.value; save(); });
   on('#sZoom', 'change', e => { S.zoom = +e.target.value; save(); });
   on('#sFit', 'change', e => { S.fitPage = e.target.checked; save(); });
@@ -764,9 +848,6 @@ function renderSettings() {
   on('#sRec', 'change', e => { S.reciter = e.target.value; save(); });
   on('#sRep', 'change', e => { S.repeat = +e.target.value; save(); });
   on('#sGoal', 'change', e => { S.dailyGoal = clamp(+e.target.value || 1, 1, 60); save(); });
-  on('#sMode', 'change', e => { S.dailyMode = e.target.value; $('#fixRow').hidden = e.target.value !== 'fixed'; save(); });
-  on('#sFix', 'change', e => { S.fixedSurah = +e.target.value; save(); });
-  on('#sKahf', 'change', e => { S.fridayKahf = e.target.checked; save(); });
   on('#sRst', 'click', () => { if (confirm('Reset khatam progress to 0?')) { ST.khatam = []; save(); renderSettings(); } });
   on('#sExp', 'click', () => {
     const a = document.createElement('a');
@@ -779,7 +860,7 @@ function renderSettings() {
       const d = JSON.parse(await e.target.files[0].text());
       if (!Array.isArray(d.bms) || !d.settings) throw 0;
       ST = Object.assign(structuredClone(DEF), d); ST.settings = Object.assign({}, DEF.settings, d.settings);
-      save(); setTheme(ST.settings.theme); toast('Backup restored'); renderSettings();
+      setTheme(); save(); toast('Backup restored'); renderSettings();
     } catch { toast('That file is not a valid backup'); }
   });
 }
@@ -787,7 +868,7 @@ function renderSettings() {
 /* ───────────── boot ───────────── */
 async function boot() {
   const t0 = Date.now(), msg = t => { const m = $('#bootmsg'); if (m) m.textContent = t; };
-  setTheme(ST.settings.theme);
+  setTheme();
   try {
     msg('Loading the Quran…');
     await loadData();

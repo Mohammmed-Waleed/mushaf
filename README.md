@@ -2,17 +2,17 @@
 
 A personal Quran reader in the familiar **Indo-Pak (Nastaleeq) handwriting**, with two ways to read:
 
-- **Big text** (default) — the same Hanafi Nastaleeq script at one fixed, comfortable size (26 px). No scrolling: swipe left/right to turn screens (swipe right = forward, like an Urdu/Arabic book). Mushaf page numbers are kept, each page's text is nudged slightly so its last screen is full, and pages 1–2 are framed cover pages with larger text that fills the page.
-- **15-line mushaf** — 610 fixed pages with the same page and line breaks as the printed Qudratullah/Taj-style copy (Ayat al-Kursi is on page 42, Para 30 starts on page 586).
+- **15-line mushaf** (default) — 610 fixed pages with the same page and line breaks as the printed Qudratullah/Taj-style copy (Ayat al-Kursi is on page 42, Para 30 starts on page 586). Pages 1–2 are framed cover pages with larger text that fills the page.
+- **Big text** — the same Hanafi Nastaleeq script at one fixed, comfortable size (26 px). No scrolling: swipe left/right to turn screens (swipe right = forward, like an Urdu/Arabic book). Mushaf page numbers are kept, each page's text is nudged slightly so its last screen is full.
 
 No build step, no framework, no account. It is a static web app that installs as a PWA and works offline.
 
 ## Features
 
 - **Separate Sura and Para indexes** — 114 suras with search; 30 paras with their names (Alif Laam Meem, Sayaqool, … Amma), opening words, start ayah and page.
-- **View and theme** — `Aa` button in the reader switches between Big text and the 15-line mushaf, and picks a light / sepia / dark / black themes.
+- **Switching view** — the `Aa` button in the reader switches between 15-line mushaf and Big text. Pages turn with a slide animation, and in the 15-line view the page follows your finger. Light theme only.
 - **Bookmarks** — one-tap page ribbon, or tap any ayah to bookmark it with a colour and note. Edit/delete in the *Saved* tab.
-- **Daily tab** — surah of the day (rotating through all 114, or pin one; Al-Kahf automatically on Fridays), ayah of the day, daily page goal with streak, khatam progress, and a *Resume* button.
+- **Daily tab** — a daily page goal (with +/− buttons) joined to *Continue reading*, plus your own list of **daily surahs** (add any surah with *+ Add surah*, e.g. Yaseen, Al-Mulk). Surahs reset each day and tick automatically once you have read all their pages, or you can mark them done after listening. A day counts toward your streak when the page goal is met and every listed surah is done; khatam progress is tracked too.
 - **Tap an ayah** for English (Saheeh International) and/or Urdu (Fateh Muhammad Jalandhry) translation, copy, share, play.
 - **Audio** — ayah-by-ayah recitation that follows along and keeps the playing ayah in view; six reciters; repeat each ayah 1/2/3/5/10× for memorising.
 - **Search** — sura name, `2:255`, `page 300`, `para 30`, Arabic text (diacritic-insensitive), or English meaning.
